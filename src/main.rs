@@ -1,9 +1,15 @@
 struct CPU {
-    registers: [u8; 16],
-    position_in_memory: usize,
     memory: [u8; 0x1000],
+
+    // After 16 function calls we will get stack overflow.
     stack: [u16; 16],
     stack_pointer: usize,
+
+    // 0 to F numbers can address 16 registers.
+    registers: [u8; 16],
+
+    // Program counter.
+    position_in_memory: usize,
 }
 
 impl CPU {
@@ -26,30 +32,32 @@ impl CPU {
             // Increment position in memory to point to the next instruction.
             self.position_in_memory += 2;
 
-            let x = ((opcode & 0x0F00) >> 8) as u8;
-            let y = ((opcode & 0x00F0) >> 4) as u8;
-            let op_minor = (opcode & 0x000F) as u8;
-            let addr = opcode & 0x0FFF;
+            // Read an opcode group.
+            let c = ((opcode & 0xF000) >> 12) as u8;
 
-            match opcode {
-                0x0000 => {
+            // Read the first register.
+            let x = ((opcode & 0x0F00) >> 8) as u8;
+
+            // Read the second register.
+            let y = ((opcode & 0x00F0) >> 4) as u8;
+
+            // Read an opcode subgroup.
+            let d = ((opcode & 0x000F) >> 0) as u8;
+
+            // Read a memory address.
+            let nnn = opcode & 0x0FFF;
+
+            // Read an integer.
+            // let kk  = (opcode & 0x00FF) as u8;
+
+            match (c, x, y, d) {
+                (0, 0, 0, 0) => {
                     return;
                 }
-                0x00EE => {
-                    self.ret();
-                }
-                0x2000..=0x2FFF => {
-                    self.call(addr);
-                }
-                0x8000..=0x8FFF => match op_minor {
-                    4 => {
-                        self.add_xy(x, y);
-                    }
-                    _ => {
-                        unimplemented!("opcode: {:04x}", opcode);
-                    }
-                },
-                _ => unimplemented!("opcode {:04x}", opcode),
+                (0, 0, 0xE, 0xE) => self.ret(),
+                (0x2, _, _, _) => self.call(nnn),
+                (0x8, _, _, 0x4) => self.add_xy(x, y),
+                _ => todo!("opcode {:04x}", opcode),
             }
         }
     }
